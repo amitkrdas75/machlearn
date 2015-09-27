@@ -1,0 +1,104 @@
+---
+title: "Using Machine Learning Technique to predict Health Wellness"
+output: html_document
+---
+
+### Executive Summary
+
+Thie objective of this project is to analyze and model the data coming from accelerometers on the belt, forearm, arm, and dumbell of 6 subjects participating in a study conducted by **Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H.** as a part of the research study **Qualitative Activity Recognition of Weight Lifting Exercises**. The subjects were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+### Approach and steps in the project:
+
+1. First load the training data from the CSV file **pml-training.csv**
+
+2. Decide on a strategy to select significant predictors from the whole bunch of predictors in the training dataset which can be used to predict the outcome variable "classe"
+
+3. Pre-process predictor variables
+
+4. Come up with the predictive model from the training dataset
+
+5. Load the testing data from the CSV file **pml-testing.csv**
+
+6. Apply the model to predict the outcome variable "classe" for each row of the testing dataset
+
+**Load all required libraries first:**
+
+```{r, echo=TRUE, results='hide', message = FALSE}
+
+library(dplyr)
+library(caret)
+
+```
+
+**Step 1 : Load the training and test datasets**
+
+```{r}
+training_data <- read.csv("./pml-training.csv")
+training_data <- mutate(training_data, classe = as.numeric(classe))
+hist(training_data$classe, main = "Frquency distribution of classe", xlab = "Classe (A=1;B=2,C=3,D=4,E=5)")
+
+testing_data <- read.csv("./pml-testing.csv")
+
+```
+
+**Step 2 : Strategize and select significant predictors**
+
+1. First of all, take a look at the training dataset to see if there are fields having all missing values. In that case those variables need to be dropped from the set of predictor variables as anyway they will be of no use while prediction. So, as a first step, filter out all those fields from the testing dataset.
+
+2. Next take out all variables for which it is anyway known that will not have any impact on predicted outcome e.g. user name, time stamp, etc. This is because goal of machine learning classification is to produce a classifier that will predict well *on future data* - on data that is *not in the training set*.  This means the goal is to have the classifier work *on new users* who are *not part of that study*. Or for that matter, the timestamps won't be related.
+
+3. The num_window variable is only in there as bookkeeping info - it is not a predictor. It identifies a short time sequence of samples that are part of the same trial.  The experimenters split up the trial (one exercise repetition) into windows, and the window number is in there so they can easily compute the summary statistics (mean, variance, skewness, kurtosis) over each window.
+
+4. Trim down the training dataset to retain only the significant predictors as determined above.
+
+```{r}
+# Finding fields with missing data from testing dataset ...
+
+ColNums_NotAllMissing <- function(df){as.vector(which(colSums(is.na(df)) != nrow(df)))}
+trim_testing_data <- testing_data %>% select(ColNums_NotAllMissing(.))
+
+# Taking out all other irrelevant book-keeping fields ...
+
+trim_testing_data <- select(trim_testing_data, -X, -user_name, -raw_timestamp_part_1, -raw_timestamp_part_2, -cvtd_timestamp, -new_window, -num_window, -problem_id)
+
+test_varnames <- names(trim_testing_data)
+
+# Trim down the training dataset to consist only the significant predictors ...
+
+trim_training_data1 <- training_data[test_varnames]
+trim_training_data2 <- select(training_data, classe)
+trim_training_data <- cbind(trim_training_data1, trim_training_data2)
+
+```
+
+**Step 3 : Pre-process predictor variables**
+
+```{r}
+
+preproc <- preProcess(trim_training_data[ , -53], method = "pca")
+
+```
+
+**Step 4 : Train a model**
+  
+This is a clear problem of classification as we are trying to predict categories from labeled data. So, I've planned to use prediction with basic decision tree.
+
+```{r}  
+
+trainPC <- predict(preproc, trim_training_data[ , -53])
+modelFit <- train(trim_training_data$classe ~ ., method = "rpart", data = trainPC)
+
+```
+
+**Step 5 : Load the testing data**
+
+Already done above as a part of step 2.
+
+**Step 6 : Predict "classe" for each tect case of test dataset**
+
+```{r}
+
+testPC <- predict(preproc, trim_testing_data)
+predict(modelFit, testPC)
+
+```
