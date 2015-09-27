@@ -1,6 +1,6 @@
 ---
 title: "Using Machine Learning Technique to predict Health Wellness"
-output: html_document
+output: word_document
 ---
 
 ### Executive Summary
